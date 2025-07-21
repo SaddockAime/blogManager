@@ -1,9 +1,10 @@
 import multer from "multer";
-import { Request,Response } from "express";
+import { Request, Response } from "express";
 import { v2 as cloudinary } from "cloudinary";
-import os from "os";
-import { writeFile, unlink ,readFile} from "fs";
+import { readFile } from "fs";
 import { join } from "path";
+import { config } from "dotenv";
+config();
 
 const cloudinary_api_key = process.env.CLOUDINARY_API_KEY;
 const cloudinary_api_secret = process.env.CLOUDINARY_API_SECRET;
@@ -16,74 +17,74 @@ cloudinary.config({
   secure: true,
 });
 
-export const uploadFile = (file: Express.Multer.File): Promise<String> => {
+export const uploadFile = (file: Express.Multer.File): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const buffer = file?.buffer || Buffer.from("");
-    const tempFilePath = join(os.tmpdir(), file?.originalname || "");
+    if (!file) {
+      console.error("No file provided for upload");
+    }
 
-    writeFile(tempFilePath, buffer, (err) => {
-      if (err) {
-        throw new Error("Error writing file to temp folder");
-      }
-    });
+    const filePath = file.path;
+
+    if (!filePath) {
+      console.error("File path not available");
+    }
+
     cloudinary.uploader.upload(
-      tempFilePath,
+      filePath,
       {
         use_filename: true,
         unique_filename: false,
         overwrite: true,
       },
-      async (error, result) => {
+      (error, result) => {
         if (error) {
-          console.error("Error uploading file:", error);
-          reject(new Error("Error uploading file"));
+          console.error("Cloudinary upload error:", error);
         }
-        unlink(tempFilePath, (err) => {
-          reject(new Error("Error uploading file"));
-        });
-        resolve(result?.secure_url as string);
+        if (!result?.secure_url) {
+          reject(new Error("No secure URL returned from Cloudinary"));
+          return;
+        }
+        resolve(result.secure_url);
       }
     );
   });
 };
 
-const getExtensation = (ext:string)=>{
-    let ex= '';
-    switch(ext){
-        case 'image/jpeg':
-       ex= 'jpg';
-        break;
-        case 'image/png':
-            ex='png'
-            break
-            default :
-            ex='jpg'
-
-    }
-    return ex
-}
+const getExtensation = (ext: string) => {
+  let ex = "";
+  switch (ext) {
+    case "image/jpeg":
+      ex = "jpg";
+      break;
+    case "image/png":
+      ex = "png";
+      break;
+    default:
+      ex = "jpg";
+  }
+  return ex;
+};
 const MulterFilterFile = (req: any, file: any, cb: any) => {
   const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-  cb(null, uniqueSuffix+ "-"+ file.originalname);
+  cb(null, uniqueSuffix + "-" + file.originalname);
 };
 export const storage = multer.diskStorage({
   destination: "uploads",
   filename: MulterFilterFile,
 });
-interface RequestParams extends Request{
-    params:{
-        filename:string
+interface RequestParams extends Request {
+  params: {
+    filename: string;
+  };
+}
+export const ReadFileName = (req: RequestParams, res: Response) => {
+  const { filename } = req.params;
+  const path = join(__dirname, "../../uploads/" + filename);
+  readFile(path, (error, result) => {
+    if (error) {
+      console.log(error);
+      res.send(error);
     }
-}
-export const ReadFileName = (req:RequestParams,res:Response)=>{
-    const {filename}= req.params
-    const path = join(__dirname,'../../uploads/'+filename)
-    readFile(path,(error,result)=>{
-        if(error){
-            console.log(error)
-            res.send(error)
-        }
-        res.send(result)
-    
-    })
-}
+    res.send(result);
+  });
+};

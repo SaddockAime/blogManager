@@ -5,7 +5,6 @@ import { connectDB } from "./utils/helper";
 
 config();
 
-
 const app = express();
 
 app.use(express.json());

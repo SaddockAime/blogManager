@@ -90,23 +90,38 @@ export const getBlog = async (req: Request, res: Response) => {
 
 export const createBlog = async (req: IRequestBlog, res: Response) => {
     try {
- const {file} = req
-    
-        const _id = req?.user?._id as string
+        const { file } = req;
+        
+        const _id = req?.user?._id as string;
         const author = await userModel.findOne({
             _id
-        })
+        });
        
         const { title, description, isPublished, content } = req.body;
-        // const image_url = await uploadFile(file as Express.Multer.File)
-        const newBlog =new blogModel({
+
+        let image_url: string | null = null;
+        
+        if (file) {
+            try {
+                image_url = await uploadFile(file as Express.Multer.File);
+            } catch (error) {
+                console.error('Upload error:', error);
+            }
+        }
+
+        const slug = generateSlug(title);
+
+        const newBlog = new blogModel({
             title,
             description,
             isPublished,
             content,
-            blog_image_url:file?.path
-        })
-        await newBlog.save()
+            slug,
+            author,
+            blog_image_url: image_url
+        });
+        
+        await newBlog.save();
        
         ResponseService({
             data: newBlog,
